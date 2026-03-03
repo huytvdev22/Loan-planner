@@ -128,6 +128,95 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
     return data;
   }, [planSchedule, actualSchedule, calculatedConfig]);
 
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+
+  const planScheduleToday = useMemo(() => {
+    return planSchedule.filter(row => row.date <= todayStr);
+  }, [planSchedule, todayStr]);
+
+  const actualScheduleToday = useMemo(() => {
+    return actualSchedule.filter(row => row.date <= todayStr);
+  }, [actualSchedule, todayStr]);
+
+  const planSummaryToday = useMemo(() => calculatedConfig ? LoanPlanEngine.calculateSummary(planScheduleToday) : null, [planScheduleToday, calculatedConfig]);
+  const actualSummaryToday = useMemo(() => calculatedConfig ? LoanPlanEngine.calculateSummary(actualScheduleToday) : null, [actualScheduleToday, calculatedConfig]);
+
+  const comparisonToday = useMemo(
+    () => (planSummaryToday && actualSummaryToday) ? ComparisonEngine.compare(planSummaryToday, actualSummaryToday) : null,
+    [planSummaryToday, actualSummaryToday]
+  );
+
+  const renderComparisonTable = (comp: any, title: string, isTotal: boolean = false) => (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ArrowRightLeft className="w-5 h-5 text-indigo-600" />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Chỉ tiêu</TableHead>
+              <TableHead className="text-right">Kế hoạch</TableHead>
+              <TableHead className="text-right">Thực tế</TableHead>
+              <TableHead className="text-right">Chênh lệch</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow>
+              <TableCell className="font-medium">Tổng tiền gốc</TableCell>
+              <TableCell className="text-right">{formatCurrency(comp.plan.totalPrincipal)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(comp.actual.totalPrincipal)}</TableCell>
+              <TableCell className="text-right text-gray-500">-</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Tổng tiền lãi</TableCell>
+              <TableCell className="text-right">{formatCurrency(comp.plan.totalInterest)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(comp.actual.totalInterest)}</TableCell>
+              <TableCell className="text-right font-bold text-emerald-600">
+                {comp.diff.totalInterest < 0 ? `Tiết kiệm ${formatCurrency(Math.abs(comp.diff.totalInterest))}` : formatCurrency(comp.diff.totalInterest)}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Tổng tiền phạt</TableCell>
+              <TableCell className="text-right">{formatCurrency(comp.plan.totalPenalty)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(comp.actual.totalPenalty)}</TableCell>
+              <TableCell className="text-right font-bold text-rose-600">
+                {comp.diff.totalPenalty > 0 ? `Phát sinh ${formatCurrency(comp.diff.totalPenalty)}` : '-'}
+              </TableCell>
+            </TableRow>
+            <TableRow className="bg-indigo-50/50">
+              <TableCell className="font-bold text-indigo-900">Tổng tiền phải trả</TableCell>
+              <TableCell className="text-right font-bold text-indigo-900">{formatCurrency(comp.plan.totalPayment)}</TableCell>
+              <TableCell className="text-right font-bold text-indigo-900">{formatCurrency(comp.actual.totalPayment)}</TableCell>
+              <TableCell className="text-right font-bold text-indigo-900">
+                {comp.diff.totalPayment < 0 ? `Giảm ${formatCurrency(Math.abs(comp.diff.totalPayment))}` : `Tăng ${formatCurrency(comp.diff.totalPayment)}`}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Thời gian vay</TableCell>
+              <TableCell className="text-right">{comp.plan.durationMonths} tháng</TableCell>
+              <TableCell className="text-right">
+                {comp.actual.durationMonths} tháng
+                {isTotal && comp.actual.durationMonths < comp.plan.durationMonths && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800">
+                    Tất toán sớm
+                  </span>
+                )}
+              </TableCell>
+              <TableCell className="text-right font-bold text-emerald-600">
+                {comp.diff.durationMonths < 0 ? `Rút ngắn ${Math.abs(comp.diff.durationMonths)} tháng` : '-'}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+
   const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setConfig((prev) => ({
@@ -372,90 +461,26 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
         <div className="lg:col-span-2 space-y-8">
           {calculatedConfig && comparison ? (
             <>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <ArrowRightLeft className="w-5 h-5 text-indigo-600" />
-                    So sánh Kế hoạch & Thực tế
-                  </CardTitle>
-                </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Chỉ tiêu</TableHead>
-                    <TableHead className="text-right">Kế hoạch</TableHead>
-                    <TableHead className="text-right">Thực tế</TableHead>
-                    <TableHead className="text-right">Chênh lệch</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="font-medium">Tổng tiền gốc</TableCell>
-                    <TableCell className="text-right">{formatCurrency(comparison.plan.totalPrincipal)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(comparison.actual.totalPrincipal)}</TableCell>
-                    <TableCell className="text-right text-gray-500">-</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Tổng tiền lãi</TableCell>
-                    <TableCell className="text-right">{formatCurrency(comparison.plan.totalInterest)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(comparison.actual.totalInterest)}</TableCell>
-                    <TableCell className="text-right font-bold text-emerald-600">
-                      {comparison.diff.totalInterest < 0 ? `Tiết kiệm ${formatCurrency(Math.abs(comparison.diff.totalInterest))}` : formatCurrency(comparison.diff.totalInterest)}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Tổng tiền phạt</TableCell>
-                    <TableCell className="text-right">{formatCurrency(comparison.plan.totalPenalty)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(comparison.actual.totalPenalty)}</TableCell>
-                    <TableCell className="text-right font-bold text-rose-600">
-                      {comparison.diff.totalPenalty > 0 ? `Phát sinh ${formatCurrency(comparison.diff.totalPenalty)}` : '-'}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow className="bg-indigo-50/50">
-                    <TableCell className="font-bold text-indigo-900">Tổng tiền phải trả</TableCell>
-                    <TableCell className="text-right font-bold text-indigo-900">{formatCurrency(comparison.plan.totalPayment)}</TableCell>
-                    <TableCell className="text-right font-bold text-indigo-900">{formatCurrency(comparison.actual.totalPayment)}</TableCell>
-                    <TableCell className="text-right font-bold text-indigo-900">
-                      {comparison.diff.totalPayment < 0 ? `Giảm ${formatCurrency(Math.abs(comparison.diff.totalPayment))}` : `Tăng ${formatCurrency(comparison.diff.totalPayment)}`}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Thời gian vay</TableCell>
-                    <TableCell className="text-right">{comparison.plan.durationMonths} tháng</TableCell>
-                    <TableCell className="text-right">
-                      {comparison.actual.durationMonths} tháng
-                      {comparison.actual.durationMonths < comparison.plan.durationMonths && (
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800">
-                          Tất toán sớm
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-emerald-600">
-                      {comparison.diff.durationMonths < 0 ? `Rút ngắn ${Math.abs(comparison.diff.durationMonths)} tháng` : '-'}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+              {renderComparisonTable(comparison, "So sánh tổng thể (Toàn bộ kỳ vay)", true)}
+              
+              {comparisonToday && renderComparisonTable(comparisonToday, "So sánh đến hiện tại (Tạm tính)", false)}
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Biểu đồ so sánh dư nợ</CardTitle>
-                <CardDescription>Kế hoạch vs Thực tế</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => setShowChart(!showChart)}>
-                {showChart ? 'Ẩn biểu đồ' : 'Hiện biểu đồ'}
-              </Button>
-            </CardHeader>
-              {showChart && (
-                <CardContent>
-                  <OutstandingChart data={chartData} showActual={true} />
-                </CardContent>
-              )}
-            </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Biểu đồ so sánh dư nợ</CardTitle>
+                    <CardDescription>Kế hoạch vs Thực tế</CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setShowChart(!showChart)}>
+                    {showChart ? 'Ẩn biểu đồ' : 'Hiện biểu đồ'}
+                  </Button>
+                </CardHeader>
+                  {showChart && (
+                    <CardContent>
+                      <OutstandingChart data={chartData} showActual={true} />
+                    </CardContent>
+                  )}
+                </Card>
             </>
           ) : (
             <Card className="h-full min-h-[400px] flex items-center justify-center border-dashed">
