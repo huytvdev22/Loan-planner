@@ -16,6 +16,7 @@ interface ChartData {
   month: number;
   planRemaining: number;
   actualRemaining?: number;
+  date?: string;
 }
 
 interface OutstandingChartProps {
@@ -57,7 +58,16 @@ export function OutstandingChart({ data, showActual = false }: OutstandingChartP
           />
           <Tooltip
             formatter={(value: any) => [formatCurrency(Number(value)), 'Dư nợ']}
-            labelFormatter={(label) => `Tháng ${label}`}
+            labelFormatter={(label, payload) => {
+              if (payload && payload.length > 0) {
+                const data = payload[0].payload as ChartData;
+                if (data.date) {
+                  const [year, month] = data.date.split('-');
+                  return `Tháng ${label} (${month}/${year})`;
+                }
+              }
+              return `Tháng ${label}`;
+            }}
             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
           />
           <Legend wrapperStyle={{ paddingTop: '20px' }} />

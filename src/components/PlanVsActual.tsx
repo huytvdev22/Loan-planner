@@ -123,6 +123,7 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
           month: i,
           planRemaining: planRow.endingBalance,
           actualRemaining: actualRow ? actualRow.endingBalance : undefined,
+          date: planRow.date,
         });
       }
     }
@@ -496,7 +497,7 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4 max-h-[320px] overflow-y-auto pr-2">
+              <div className="space-y-4">
                 <AnimatePresence>
                   {extraPayments.map((payment) => (
                     <motion.div

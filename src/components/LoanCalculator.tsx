@@ -61,6 +61,7 @@ export function LoanCalculator({ initialData }: { initialData?: any }) {
     return schedule.map((row) => ({
       month: row.month,
       planRemaining: row.endingBalance,
+      date: row.date,
     }));
   }, [schedule]);
 
