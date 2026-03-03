@@ -12,18 +12,29 @@ import { formatCurrency, formatDate } from '../lib/utils';
 import { saveHistory } from '../lib/history';
 import { OutstandingChart } from './OutstandingChart';
 import { motion } from 'motion/react';
-import { Calculator, BarChart3, Info, Play } from 'lucide-react';
+import { Calculator, BarChart3, Info, Play, RotateCcw } from 'lucide-react';
+
+const DEFAULT_CONFIG: LoanConfig = {
+  principal: 1000000000,
+  durationMonths: 120,
+  interestRateYearly: 10.5,
+  promotionalRateYearly: 8.5,
+  promotionalMonths: 12,
+  paymentMethod: 'equal_principal',
+  startDate: new Date().toISOString().split('T')[0],
+  firstPaymentDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+};
 
 export function LoanCalculator({ initialData }: { initialData?: any }) {
-  const [config, setConfig] = useState<LoanConfig>(initialData?.config || {
-    principal: 1000000000,
-    durationMonths: 120,
-    interestRateYearly: 10.5,
-    promotionalRateYearly: 8.5,
-    promotionalMonths: 12,
-    paymentMethod: 'equal_principal',
-    startDate: new Date().toISOString().split('T')[0],
-    firstPaymentDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+  const [config, setConfig] = useState<LoanConfig>(() => {
+    if (initialData?.config) return initialData.config;
+    const saved = localStorage.getItem('latest_calculator_config');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return DEFAULT_CONFIG;
   });
 
   const [calculatedConfig, setCalculatedConfig] = useState<LoanConfig | null>(initialData?.config || null);
@@ -34,6 +45,10 @@ export function LoanCalculator({ initialData }: { initialData?: any }) {
       setCalculatedConfig(initialData.config);
     }
   }, [initialData]);
+
+  useEffect(() => {
+    localStorage.setItem('latest_calculator_config', JSON.stringify(config));
+  }, [config]);
 
   const [showChart, setShowChart] = useState(true);
 
@@ -64,6 +79,11 @@ export function LoanCalculator({ initialData }: { initialData?: any }) {
       name: `Vay ${formatCurrency(config.principal)} trong ${config.durationMonths} tháng`,
       data: { config }
     });
+  };
+
+  const handleReset = () => {
+    setConfig(DEFAULT_CONFIG);
+    setCalculatedConfig(null);
   };
 
   return (
@@ -166,10 +186,16 @@ export function LoanCalculator({ initialData }: { initialData?: any }) {
                 <option value="equal_installment">Trả góp đều (Annuity)</option>
               </Select>
             </div>
-            <Button className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleCalculate}>
-              <Play className="w-4 h-4 mr-2" />
-              Tính toán
-            </Button>
+            <div className="flex gap-2 mt-4">
+              <Button variant="outline" className="w-1/3" onClick={handleReset}>
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Đặt lại
+              </Button>
+              <Button className="w-2/3 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleCalculate}>
+                <Play className="w-4 h-4 mr-2" />
+                Tính toán
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

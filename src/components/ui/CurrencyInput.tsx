@@ -1,4 +1,4 @@
-import React, { useState, useEffect, ChangeEvent } from 'react';
+import React, { useState, useEffect, ChangeEvent, useRef } from 'react';
 import { Input, InputProps } from './Input';
 import { cn } from '@/src/lib/utils';
 
@@ -9,6 +9,8 @@ export type CurrencyInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement
 
 export function CurrencyInput({ value, onValueChange, className, ...props }: CurrencyInputProps) {
   const [inputValue, setInputValue] = useState<string>('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const cursorPosition = useRef<number | null>(null);
 
   useEffect(() => {
     if (value !== undefined && value !== null) {
@@ -18,22 +20,52 @@ export function CurrencyInput({ value, onValueChange, className, ...props }: Cur
     }
   }, [value]);
 
+  useEffect(() => {
+    if (cursorPosition.current !== null && inputRef.current) {
+      inputRef.current.setSelectionRange(cursorPosition.current, cursorPosition.current);
+      cursorPosition.current = null;
+    }
+  }, [inputValue]);
+
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value.replace(/[^0-9]/g, '');
+    const input = e.target;
+    const selectionStart = input.selectionStart;
+    const newValue = input.value;
+
+    const rawValue = newValue.replace(/[^0-9]/g, '');
     const numValue = parseInt(rawValue, 10);
     
-    if (isNaN(numValue)) {
-      setInputValue('');
-      onValueChange(0);
-    } else {
-      setInputValue(new Intl.NumberFormat('vi-VN').format(numValue));
-      onValueChange(numValue);
+    let formattedValue = '';
+    if (!isNaN(numValue)) {
+      formattedValue = new Intl.NumberFormat('vi-VN').format(numValue);
     }
+
+    if (selectionStart !== null) {
+      const beforeCursorNew = newValue.substring(0, selectionStart);
+      const digitsBeforeCursor = beforeCursorNew.replace(/[^0-9]/g, '').length;
+      
+      let digitsCount = 0;
+      let newCursorPos = 0;
+      for (let i = 0; i < formattedValue.length; i++) {
+        if (digitsCount === digitsBeforeCursor) {
+          break;
+        }
+        if (/[0-9]/.test(formattedValue[i])) {
+          digitsCount++;
+        }
+        newCursorPos = i + 1;
+      }
+      cursorPosition.current = newCursorPos;
+    }
+
+    setInputValue(formattedValue);
+    onValueChange(isNaN(numValue) ? 0 : numValue);
   };
 
   return (
     <div className="relative">
       <Input
+        ref={inputRef}
         type="text"
         value={inputValue}
         onChange={handleChange}

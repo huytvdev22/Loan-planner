@@ -14,30 +14,57 @@ import { formatCurrency, formatDate } from '../lib/utils';
 import { saveHistory } from '../lib/history';
 import { OutstandingChart } from './OutstandingChart';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Plus, Trash2, ArrowRightLeft, AlertCircle, CheckCircle2, TrendingDown, Play } from 'lucide-react';
+import { Settings, Plus, Trash2, ArrowRightLeft, AlertCircle, CheckCircle2, TrendingDown, Play, RotateCcw } from 'lucide-react';
+
+const DEFAULT_CONFIG: LoanConfig = {
+  principal: 1000000000,
+  durationMonths: 120,
+  interestRateYearly: 10.5,
+  promotionalRateYearly: 8.5,
+  promotionalMonths: 12,
+  paymentMethod: 'equal_principal',
+  startDate: new Date().toISOString().split('T')[0],
+  firstPaymentDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+};
+
+const DEFAULT_PENALTY_RULES: PenaltyRule[] = [
+  { id: '1', fromMonth: 1, toMonth: 12, penaltyRate: 3 },
+  { id: '2', fromMonth: 13, toMonth: 36, penaltyRate: 2 },
+  { id: '3', fromMonth: 37, toMonth: 60, penaltyRate: 1 },
+  { id: '4', fromMonth: 61, toMonth: 'remaining', penaltyRate: 0 },
+];
+
+const DEFAULT_EXTRA_PAYMENTS: ExtraPayment[] = [
+  { id: '1', date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0], amount: 200000000 },
+];
 
 export function PlanVsActual({ initialData }: { initialData?: any }) {
-  const [config, setConfig] = useState<LoanConfig>(initialData?.config || {
-    principal: 1000000000,
-    durationMonths: 120,
-    interestRateYearly: 10.5,
-    promotionalRateYearly: 8.5,
-    promotionalMonths: 12,
-    paymentMethod: 'equal_principal',
-    startDate: new Date().toISOString().split('T')[0],
-    firstPaymentDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+  const [config, setConfig] = useState<LoanConfig>(() => {
+    if (initialData?.config) return initialData.config;
+    const saved = localStorage.getItem('latest_comparison_config');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return DEFAULT_CONFIG;
   });
 
-  const [penaltyRules, setPenaltyRules] = useState<PenaltyRule[]>(initialData?.penaltyRules || [
-    { id: '1', fromMonth: 1, toMonth: 12, penaltyRate: 3 },
-    { id: '2', fromMonth: 13, toMonth: 36, penaltyRate: 2 },
-    { id: '3', fromMonth: 37, toMonth: 60, penaltyRate: 1 },
-    { id: '4', fromMonth: 61, toMonth: 'remaining', penaltyRate: 0 },
-  ]);
+  const [penaltyRules, setPenaltyRules] = useState<PenaltyRule[]>(() => {
+    if (initialData?.penaltyRules) return initialData.penaltyRules;
+    const saved = localStorage.getItem('latest_comparison_penalty_rules');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return DEFAULT_PENALTY_RULES;
+  });
 
-  const [extraPayments, setExtraPayments] = useState<ExtraPayment[]>(initialData?.extraPayments || [
-    { id: '1', date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0], amount: 200000000 },
-  ]);
+  const [extraPayments, setExtraPayments] = useState<ExtraPayment[]>(() => {
+    if (initialData?.extraPayments) return initialData.extraPayments;
+    const saved = localStorage.getItem('latest_comparison_extra_payments');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return DEFAULT_EXTRA_PAYMENTS;
+  });
 
   const [calculatedConfig, setCalculatedConfig] = useState<LoanConfig | null>(initialData?.config || null);
   const [calculatedPenaltyRules, setCalculatedPenaltyRules] = useState<PenaltyRule[]>(initialData?.penaltyRules || []);
@@ -53,6 +80,18 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
       setCalculatedExtraPayments(initialData.extraPayments || []);
     }
   }, [initialData]);
+
+  useEffect(() => {
+    localStorage.setItem('latest_comparison_config', JSON.stringify(config));
+  }, [config]);
+
+  useEffect(() => {
+    localStorage.setItem('latest_comparison_penalty_rules', JSON.stringify(penaltyRules));
+  }, [penaltyRules]);
+
+  useEffect(() => {
+    localStorage.setItem('latest_comparison_extra_payments', JSON.stringify(extraPayments));
+  }, [extraPayments]);
 
   const [showChart, setShowChart] = useState(true);
 
@@ -112,6 +151,15 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
         extraPayments
       }
     });
+  };
+
+  const handleReset = () => {
+    setConfig(DEFAULT_CONFIG);
+    setPenaltyRules(DEFAULT_PENALTY_RULES);
+    setExtraPayments(DEFAULT_EXTRA_PAYMENTS);
+    setCalculatedConfig(null);
+    setCalculatedPenaltyRules([]);
+    setCalculatedExtraPayments([]);
   };
 
   const addPenaltyRule = () => {
@@ -305,10 +353,16 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
             </CardContent>
           </Card>
 
-          <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-6 text-lg shadow-lg" onClick={handleCalculate}>
-            <Play className="w-5 h-5 mr-2" />
-            Tính toán so sánh
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="w-1/3 py-6 text-lg" onClick={handleReset}>
+              <RotateCcw className="w-5 h-5 mr-2" />
+              Đặt lại
+            </Button>
+            <Button className="w-2/3 bg-indigo-600 hover:bg-indigo-700 text-white py-6 text-lg shadow-lg" onClick={handleCalculate}>
+              <Play className="w-5 h-5 mr-2" />
+              Tính toán so sánh
+            </Button>
+          </div>
         </div>
 
         <div className="lg:col-span-2 space-y-8">
