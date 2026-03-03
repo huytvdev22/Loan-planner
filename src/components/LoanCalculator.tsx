@@ -13,6 +13,7 @@ import { saveHistory } from '../lib/history';
 import { OutstandingChart } from './OutstandingChart';
 import { motion } from 'motion/react';
 import { Calculator, BarChart3, Info, Play, RotateCcw } from 'lucide-react';
+import { ShareButton } from './ShareButton';
 
 const DEFAULT_CONFIG: LoanConfig = {
   principal: 1000000000,
@@ -91,12 +92,16 @@ export function LoanCalculator({ initialData }: { initialData?: any }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-indigo-600" />
-              Thông tin khoản vay
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="w-5 h-5 text-indigo-600" />
+                Thông tin khoản vay
+              </CardTitle>
+              <ShareButton type="calculator" data={{ config }} />
+            </div>
             <CardDescription>Nhập các thông số cơ bản của khoản vay</CardDescription>
           </CardHeader>
+          {/* ... (rest of the code) */}
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="principal">Số tiền vay</Label>

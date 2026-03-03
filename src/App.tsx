@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LoanCalculator } from './components/LoanCalculator';
 import { PlanVsActual } from './components/PlanVsActual';
 import { History } from './components/History';
@@ -10,6 +10,37 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'calculator' | 'comparison' | 'history'>('calculator');
   const [loadedCalculatorData, setLoadedCalculatorData] = useState<any>(null);
   const [loadedComparisonData, setLoadedComparisonData] = useState<any>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    const data = params.get('data');
+
+    if (tab && data) {
+      try {
+        // Decode base64 string, handling UTF-8 characters
+        const json = decodeURIComponent(
+          atob(data).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join('')
+        );
+        const parsedData = JSON.parse(json);
+
+        if (tab === 'calculator') {
+          setLoadedCalculatorData(parsedData);
+          setActiveTab('calculator');
+        } else if (tab === 'comparison') {
+          setLoadedComparisonData(parsedData);
+          setActiveTab('comparison');
+        }
+        
+        // Clean up URL without reloading
+        window.history.replaceState({}, '', window.location.pathname);
+      } catch (e) {
+        console.error('Failed to parse shared data', e);
+      }
+    }
+  }, []);
 
   const handleLoadHistory = (entry: HistoryEntry) => {
     if (entry.type === 'calculator') {

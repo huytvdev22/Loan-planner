@@ -15,6 +15,7 @@ import { saveHistory } from '../lib/history';
 import { OutstandingChart } from './OutstandingChart';
 import { motion, AnimatePresence } from 'motion/react';
 import { Settings, Plus, Trash2, ArrowRightLeft, AlertCircle, CheckCircle2, TrendingDown, Play, RotateCcw } from 'lucide-react';
+import { ShareButton } from './ShareButton';
 
 const DEFAULT_CONFIG: LoanConfig = {
   principal: 1000000000,
@@ -212,10 +213,13 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
         <div className="space-y-8">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5 text-indigo-600" />
-                Cấu hình khoản vay
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-indigo-600" />
+                  Cấu hình khoản vay
+                </CardTitle>
+                <ShareButton type="comparison" data={{ config, penaltyRules, extraPayments }} />
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
