@@ -1,5 +1,5 @@
 import { LoanConfig, ExtraPayment, PenaltyRule, ScheduleRow } from '../lib/types';
-import { round, addMonths } from '../lib/utils';
+import { round, addMonths, daysBetween } from '../lib/utils';
 import { PenaltyEngine } from './PenaltyEngine';
 
 export class ActualPaymentEngine {
@@ -15,6 +15,8 @@ export class ActualPaymentEngine {
       promotionalRateYearly,
       promotionalMonths,
       paymentMethod,
+      startDate,
+      firstPaymentDate,
     } = config;
 
     const schedule: ScheduleRow[] = [];
@@ -30,7 +32,13 @@ export class ActualPaymentEngine {
       const monthlyRate = yearlyRate / 100 / 12;
       const remainingMonths = durationMonths - month + 1;
 
-      const interestPayment = round(currentBalance * monthlyRate);
+      let interestPayment = 0;
+      if (month === 1) {
+        const days = daysBetween(startDate, firstPaymentDate);
+        interestPayment = round(currentBalance * (yearlyRate / 100 / 365) * days);
+      } else {
+        interestPayment = round(currentBalance * monthlyRate);
+      }
       
       let principalPayment = 0;
       let totalPayment = 0;

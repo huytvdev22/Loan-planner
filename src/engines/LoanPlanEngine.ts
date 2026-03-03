@@ -1,5 +1,5 @@
 import { LoanConfig, ScheduleRow, LoanSummary } from '../lib/types';
-import { round, addMonths } from '../lib/utils';
+import { round, addMonths, daysBetween } from '../lib/utils';
 
 export class LoanPlanEngine {
   static generateSchedule(config: LoanConfig): ScheduleRow[] {
@@ -10,6 +10,8 @@ export class LoanPlanEngine {
       promotionalRateYearly,
       promotionalMonths,
       paymentMethod,
+      startDate,
+      firstPaymentDate,
     } = config;
 
     const schedule: ScheduleRow[] = [];
@@ -21,9 +23,16 @@ export class LoanPlanEngine {
       for (let month = 1; month <= durationMonths; month++) {
         const date = addMonths(config.firstPaymentDate, month - 1);
         const yearlyRate = month <= promotionalMonths ? promotionalRateYearly : interestRateYearly;
-        const monthlyRate = yearlyRate / 100 / 12;
         
-        const interestPayment = round(currentBalance * monthlyRate);
+        let interestPayment = 0;
+        if (month === 1) {
+          const days = daysBetween(startDate, firstPaymentDate);
+          interestPayment = round(currentBalance * (yearlyRate / 100 / 365) * days);
+        } else {
+          const monthlyRate = yearlyRate / 100 / 12;
+          interestPayment = round(currentBalance * monthlyRate);
+        }
+
         const actualPrincipalPayment = month === durationMonths || principalPayment > currentBalance ? currentBalance : principalPayment;
         const totalPayment = actualPrincipalPayment + interestPayment;
         const endingBalance = currentBalance - actualPrincipalPayment;
@@ -47,13 +56,46 @@ export class LoanPlanEngine {
         const monthlyRate = yearlyRate / 100 / 12;
         const remainingMonths = durationMonths - month + 1;
 
-        const interestPayment = round(currentBalance * monthlyRate);
+        let interestPayment = 0;
+        if (month === 1) {
+          const days = daysBetween(startDate, firstPaymentDate);
+          interestPayment = round(currentBalance * (yearlyRate / 100 / 365) * days);
+        } else {
+          interestPayment = round(currentBalance * monthlyRate);
+        }
         
         let totalPayment = 0;
         if (monthlyRate === 0) {
           totalPayment = round(currentBalance / remainingMonths);
         } else {
-          totalPayment = round(
+          // Standard PMT calculation for the remaining balance and term
+          // Note: For the first month, we use the standard PMT based on the original principal and full duration
+          // to ensure the installment amount is consistent with what the user expects for an annuity.
+          // However, strictly speaking, if the first period is odd, the PMT might need adjustment.
+          // Here we keep the PMT constant based on the *current* parameters for the *remaining* term?
+          // No, for equal_installment, the total payment should be constant (mostly).
+          
+          // Let's calculate the standard PMT based on the *original* principal and duration for the first month,
+          // and then for subsequent months, we might need to stick to that PMT or recalculate?
+          
+          // Actually, the existing logic recalculates PMT every month based on remaining balance and term.
+          // This effectively handles "re-amortization" if the balance goes off track (e.g. due to rounding).
+          // But for the first month, if we change interest, and keep the PMT formula, 
+          // the PMT formula `(currentBalance * monthlyRate * ...)` uses `monthlyRate`.
+          // It doesn't know about the day-based interest of the current month.
+          
+          // If we want a fixed monthly payment (Annuity), we should calculate it ONCE.
+          // const fixedTotalPayment = ...
+          
+          // But the current implementation recalculates it inside the loop:
+          // totalPayment = round((currentBalance * monthlyRate * ...))
+          
+          // If I use this formula for month 1, it will give the standard monthly payment.
+          // Then I subtract the day-based interest.
+          // This results in a different principal payment.
+          // This seems correct for "Fixed Payment, Odd First Period Interest".
+          
+           totalPayment = round(
             (currentBalance * monthlyRate * Math.pow(1 + monthlyRate, remainingMonths)) /
             (Math.pow(1 + monthlyRate, remainingMonths) - 1)
           );
