@@ -12,8 +12,9 @@ import { formatCurrency, formatDate } from '../lib/utils';
 import { saveHistory } from '../lib/history';
 import { OutstandingChart } from './OutstandingChart';
 import { motion } from 'motion/react';
-import { Calculator, BarChart3, Info, Play, RotateCcw } from 'lucide-react';
+import { Calculator, BarChart3, Info, Play, RotateCcw, FileDown } from 'lucide-react';
 import { ShareButton } from './ShareButton';
+import { exportToExcel } from '../lib/excel';
 
 const DEFAULT_CONFIG: LoanConfig = {
   principal: 1000000000,
@@ -85,6 +86,41 @@ export function LoanCalculator({ initialData }: { initialData?: any }) {
   const handleReset = () => {
     setConfig(DEFAULT_CONFIG);
     setCalculatedConfig(null);
+  };
+
+  const handleExport = () => {
+    if (!calculatedConfig || !summary) return;
+
+    const loanInfo = [
+      { 'Thông tin': 'Số tiền vay', 'Giá trị': calculatedConfig.principal },
+      { 'Thông tin': 'Thời gian vay (tháng)', 'Giá trị': calculatedConfig.durationMonths },
+      { 'Thông tin': 'Lãi suất thường niên (%)', 'Giá trị': calculatedConfig.interestRateYearly },
+      { 'Thông tin': 'Lãi suất ưu đãi (%)', 'Giá trị': calculatedConfig.promotionalRateYearly },
+      { 'Thông tin': 'Số tháng ưu đãi', 'Giá trị': calculatedConfig.promotionalMonths },
+      { 'Thông tin': 'Ngày bắt đầu vay', 'Giá trị': calculatedConfig.startDate },
+      { 'Thông tin': 'Ngày trả nợ đầu tiên', 'Giá trị': calculatedConfig.firstPaymentDate },
+      { 'Thông tin': 'Hình thức trả nợ', 'Giá trị': calculatedConfig.paymentMethod === 'equal_principal' ? 'Trả gốc đều' : 'Trả góp đều' },
+      { 'Thông tin': '', 'Giá trị': '' },
+      { 'Thông tin': 'TỔNG KẾT', 'Giá trị': '' },
+      { 'Thông tin': 'Tổng tiền gốc', 'Giá trị': summary.totalPrincipal },
+      { 'Thông tin': 'Tổng tiền lãi', 'Giá trị': summary.totalInterest },
+      { 'Thông tin': 'Tổng tiền phải trả', 'Giá trị': summary.totalPayment },
+    ];
+
+    const scheduleData = schedule.map(row => ({
+      'Tháng': row.month,
+      'Ngày trả': formatDate(row.date),
+      'Dư nợ đầu kỳ': row.beginningBalance,
+      'Gốc trả': row.principalPayment,
+      'Lãi trả': row.interestPayment,
+      'Tổng trả': row.totalPayment,
+      'Dư nợ còn lại': row.endingBalance,
+    }));
+
+    exportToExcel(`Lich_vay_${new Date().toISOString().split('T')[0]}`, [
+      { name: 'Thông tin khoản vay', data: loanInfo },
+      { name: 'Lịch trả nợ', data: scheduleData },
+    ]);
   };
 
   return (
@@ -259,9 +295,15 @@ export function LoanCalculator({ initialData }: { initialData?: any }) {
 
       {calculatedConfig && summary && (
         <Card>
-          <CardHeader>
-            <CardTitle>Lịch trả nợ chi tiết</CardTitle>
-            <CardDescription>Bảng chi tiết số tiền phải trả hàng tháng</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Lịch trả nợ chi tiết</CardTitle>
+              <CardDescription>Bảng chi tiết số tiền phải trả hàng tháng</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <FileDown className="w-4 h-4 mr-2" />
+              Xuất Excel
+            </Button>
           </CardHeader>
           <CardContent>
             <Table wrapperClassName="max-h-[600px]">

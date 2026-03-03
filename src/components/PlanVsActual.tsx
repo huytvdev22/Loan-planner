@@ -14,8 +14,9 @@ import { formatCurrency, formatDate } from '../lib/utils';
 import { saveHistory } from '../lib/history';
 import { OutstandingChart } from './OutstandingChart';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Plus, Trash2, ArrowRightLeft, AlertCircle, CheckCircle2, TrendingDown, Play, RotateCcw } from 'lucide-react';
+import { Settings, Plus, Trash2, ArrowRightLeft, AlertCircle, CheckCircle2, TrendingDown, Play, RotateCcw, FileDown } from 'lucide-react';
 import { ShareButton } from './ShareButton';
+import { exportToExcel } from '../lib/excel';
 
 const DEFAULT_CONFIG: LoanConfig = {
   principal: 1000000000,
@@ -136,8 +137,34 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
   }, [planSchedule, todayStr]);
 
   const actualScheduleToday = useMemo(() => {
-    return actualSchedule.filter(row => row.date <= todayStr);
-  }, [actualSchedule, todayStr]);
+    if (!calculatedConfig) return [];
+
+    // 1. Filter extra payments that happened <= today
+    const extraPaymentsSoFar = calculatedExtraPayments.filter(ep => ep.date <= todayStr);
+    
+    // 2. Generate schedule based on these payments
+    const scheduleWithPaymentsSoFar = ActualPaymentEngine.generateActualSchedule(
+      calculatedConfig, 
+      extraPaymentsSoFar, 
+      calculatedPenaltyRules
+    );
+
+    // 3. Filter/Map the schedule to exclude future regular payments
+    return scheduleWithPaymentsSoFar.map(row => {
+      if (row.date <= todayStr) {
+        return row;
+      } else {
+        // Future row: only include extra payments
+        return {
+          ...row,
+          principalPayment: 0,
+          interestPayment: 0,
+          totalPayment: (row.extraPrincipal || 0) + (row.penaltyFee || 0),
+          // We keep extraPrincipal and penaltyFee as is
+        };
+      }
+    }).filter(row => row.date <= todayStr || (row.extraPrincipal || 0) > 0 || (row.penaltyFee || 0) > 0);
+  }, [calculatedConfig, calculatedExtraPayments, calculatedPenaltyRules, todayStr]);
 
   const planSummaryToday = useMemo(() => calculatedConfig ? LoanPlanEngine.calculateSummary(planScheduleToday) : null, [planScheduleToday, calculatedConfig]);
   const actualSummaryToday = useMemo(() => calculatedConfig ? LoanPlanEngine.calculateSummary(actualScheduleToday) : null, [actualScheduleToday, calculatedConfig]);
@@ -296,6 +323,46 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
     setExtraPayments(extraPayments.filter((payment) => payment.id !== id));
   };
 
+  const handleExport = () => {
+    if (!calculatedConfig || !comparison) return;
+
+    const configInfo = [
+      { 'Thông tin': 'Số tiền vay', 'Giá trị': calculatedConfig.principal },
+      { 'Thông tin': 'Thời gian vay (tháng)', 'Giá trị': calculatedConfig.durationMonths },
+      { 'Thông tin': 'Lãi suất thường niên (%)', 'Giá trị': calculatedConfig.interestRateYearly },
+      { 'Thông tin': 'Lãi suất ưu đãi (%)', 'Giá trị': calculatedConfig.promotionalRateYearly },
+      { 'Thông tin': 'Số tháng ưu đãi', 'Giá trị': calculatedConfig.promotionalMonths },
+      { 'Thông tin': 'Ngày bắt đầu vay', 'Giá trị': calculatedConfig.startDate },
+      { 'Thông tin': 'Ngày trả nợ đầu tiên', 'Giá trị': calculatedConfig.firstPaymentDate },
+      { 'Thông tin': 'Hình thức trả nợ', 'Giá trị': calculatedConfig.paymentMethod === 'equal_principal' ? 'Trả gốc đều' : 'Trả góp đều' },
+    ];
+
+    const comparisonInfo = [
+      { 'Chỉ tiêu': 'Tổng tiền gốc', 'Kế hoạch': comparison.plan.totalPrincipal, 'Thực tế': comparison.actual.totalPrincipal, 'Chênh lệch': '-' },
+      { 'Chỉ tiêu': 'Tổng tiền lãi', 'Kế hoạch': comparison.plan.totalInterest, 'Thực tế': comparison.actual.totalInterest, 'Chênh lệch': comparison.diff.totalInterest },
+      { 'Chỉ tiêu': 'Tổng tiền phạt', 'Kế hoạch': comparison.plan.totalPenalty, 'Thực tế': comparison.actual.totalPenalty, 'Chênh lệch': comparison.diff.totalPenalty },
+      { 'Chỉ tiêu': 'Tổng tiền phải trả', 'Kế hoạch': comparison.plan.totalPayment, 'Thực tế': comparison.actual.totalPayment, 'Chênh lệch': comparison.diff.totalPayment },
+      { 'Chỉ tiêu': 'Thời gian vay (tháng)', 'Kế hoạch': comparison.plan.durationMonths, 'Thực tế': comparison.actual.durationMonths, 'Chênh lệch': comparison.diff.durationMonths },
+    ];
+
+    const actualScheduleData = actualSchedule.map(row => ({
+      'Tháng': row.month,
+      'Ngày trả': formatDate(row.date),
+      'Gốc trả': row.principalPayment,
+      'Lãi trả': row.interestPayment,
+      'Gốc trả thêm': row.extraPrincipal || 0,
+      'Phí phạt': row.penaltyFee || 0,
+      'Tổng trả': row.totalPayment,
+      'Dư nợ': row.endingBalance,
+    }));
+
+    exportToExcel(`So_sanh_vay_${new Date().toISOString().split('T')[0]}`, [
+      { name: 'Cấu hình', data: configInfo },
+      { name: 'So sánh tổng thể', data: comparisonInfo },
+      { name: 'Lịch trả nợ thực tế', data: actualScheduleData },
+    ]);
+  };
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -417,32 +484,34 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
                 <Plus className="w-4 h-4" />
               </Button>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <AnimatePresence>
-                {extraPayments.map((payment) => (
-                  <motion.div
-                    key={payment.id}
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="flex items-end gap-2"
-                  >
-                    <div className="flex-1 grid grid-cols-3 gap-2">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Ngày trả</Label>
-                        <Input type="date" value={payment.date} onChange={(e) => updateExtraPayment(payment.id, 'date', e.target.value)} />
+            <CardContent>
+              <div className="space-y-4 max-h-[320px] overflow-y-auto pr-2">
+                <AnimatePresence>
+                  {extraPayments.map((payment) => (
+                    <motion.div
+                      key={payment.id}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="flex items-end gap-2"
+                    >
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Ngày trả</Label>
+                          <Input type="date" value={payment.date} onChange={(e) => updateExtraPayment(payment.id, 'date', e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Số tiền</Label>
+                          <CurrencyInput value={payment.amount} onValueChange={(val) => updateExtraPayment(payment.id, 'amount', val)} />
+                        </div>
                       </div>
-                      <div className="space-y-1 col-span-2">
-                        <Label className="text-xs">Số tiền</Label>
-                        <CurrencyInput value={payment.amount} onValueChange={(val) => updateExtraPayment(payment.id, 'amount', val)} />
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => removeExtraPayment(payment.id)} className="text-rose-500 hover:text-rose-700 hover:bg-rose-50">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                      <Button variant="ghost" size="icon" onClick={() => removeExtraPayment(payment.id)} className="text-rose-500 hover:text-rose-700 hover:bg-rose-50">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
             </CardContent>
           </Card>
 
@@ -463,7 +532,7 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
             <>
               {renderComparisonTable(comparison, "So sánh tổng thể (Toàn bộ kỳ vay)", true)}
               
-              {comparisonToday && renderComparisonTable(comparisonToday, "So sánh đến hiện tại (Tạm tính)", false)}
+              {comparisonToday && renderComparisonTable(comparisonToday, `So sánh đến hiện tại (${formatDate(todayStr)})`, false)}
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -496,8 +565,12 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
 
       {calculatedConfig && comparison && (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Lịch trả nợ thực tế</CardTitle>
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <FileDown className="w-4 h-4 mr-2" />
+              Xuất Excel
+            </Button>
           </CardHeader>
           <CardContent>
             <Table wrapperClassName="max-h-[600px]">
