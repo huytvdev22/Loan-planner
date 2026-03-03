@@ -1,0 +1,5 @@
+{
+  "name": "Loan Calculator & Planner",
+  "description": "A comprehensive tool to calculate bank loans, configure promotional interest rates, set early repayment penalty rules, simulate actual repayment with extra principal, and compare planned vs actual schedules.",
+  "requestFramePermissions": []
+}
