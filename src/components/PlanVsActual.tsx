@@ -326,7 +326,7 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
   const handleExport = () => {
     if (!calculatedConfig || !comparison) return;
 
-    const configInfo = [
+    const configInfo: any[] = [
       { 'Thông tin': 'Số tiền vay', 'Giá trị': calculatedConfig.principal },
       { 'Thông tin': 'Thời gian vay (tháng)', 'Giá trị': calculatedConfig.durationMonths },
       { 'Thông tin': 'Lãi suất thường niên (%)', 'Giá trị': calculatedConfig.interestRateYearly },
@@ -336,6 +336,17 @@ export function PlanVsActual({ initialData }: { initialData?: any }) {
       { 'Thông tin': 'Ngày trả nợ đầu tiên', 'Giá trị': calculatedConfig.firstPaymentDate },
       { 'Thông tin': 'Hình thức trả nợ', 'Giá trị': calculatedConfig.paymentMethod === 'equal_principal' ? 'Trả gốc đều' : 'Trả góp đều' },
     ];
+
+    if (calculatedExtraPayments && calculatedExtraPayments.length > 0) {
+      configInfo.push({ 'Thông tin': '', 'Giá trị': '' });
+      configInfo.push({ 'Thông tin': 'DANH SÁCH TRẢ THÊM GỐC', 'Giá trị': '' });
+      calculatedExtraPayments.forEach(payment => {
+        configInfo.push({
+          'Thông tin': `Trả thêm ngày ${formatDate(payment.date)}`,
+          'Giá trị': payment.amount
+        });
+      });
+    }
 
     const comparisonInfo = [
       { 'Chỉ tiêu': 'Tổng tiền gốc', 'Kế hoạch': comparison.plan.totalPrincipal, 'Thực tế': comparison.actual.totalPrincipal, 'Chênh lệch': '-' },
